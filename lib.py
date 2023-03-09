@@ -52,9 +52,12 @@ class Grid(object):
         self.accepted_moves = 0
         self.attempted_moves = 0
         self.trivial_steps = 0
+        self.n_sweeps = 0
         self.last_delta_reward = None
         self.best_reward = -np.inf
         self.best_configuration = None
+        self.reward_history = []
+        self.attempted_delta_reward_history = []
 
     def pbc(self, i: int, j: int) -> tuple[int, int]:
         i_inbounds = i % self.R
@@ -174,6 +177,25 @@ class Grid(object):
             if self.reward > self.best_reward:
                 self.best_reward = self.reward
                 self.best_configuration = self.configuration
+
+    def anneal(self, beta0: float, beta1: float, beta_mult: float = 1.05):
+        beta = beta0
+        n_steps_per_sweep = len(self.snake_lengths)
+        self.reward_history = [self.reward]
+        while beta < beta1:
+            for k_step in range(n_steps_per_sweep):
+                self.try_step(beta)
+                try:
+                    assert self.validate_conf()
+                except AssertionError:
+                    sys.stderr.write(f"{old_conf=}\n")
+                    sys.stderr.write(f"{self.configuration=}\n")
+                    raise AssertionError(f"Invalid configuration at step {k_step} of sweep {k_sweep}!")
+                self.reward_history.append(self.reward)
+                self.attempted_delta_reward_history.append(self.last_delta_reward)
+            # Decrease temperature at the end of each sweep.
+            beta *= beta_mult
+            self.n_sweeps += 1
 
     def validate_conf(self) -> bool:
         flat_conf = [el for snake in self.configuration for el in snake]
