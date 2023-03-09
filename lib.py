@@ -108,29 +108,36 @@ class Grid(object):
         conf = []
         for snake_length in snake_lengths:
             # Place the head of the snake.
-            allowed_ij = list(zip(*np.where(self.grid_mask + self.wh_mask == 0)))
-            idx_r = np.random.randint(0, len(allowed_ij))
-            ij_r = allowed_ij[idx_r]
-            conf.append([ij_r])
-            self.grid_mask[ij_r[0], ij_r[1]] = 1
-            for k in range(snake_length-2):
-                # We allow all neighbors provided they are free OR wormholes.
-                allowed_ij = self.free_neighbors(*ij_r)
+            snake_placed = False
+            while not snake_placed:
+                temp_grid_mask = self.grid_mask.copy()
+                allowed_ij = list(zip(*np.where(temp_grid_mask + self.wh_mask == 0)))
+                idx_r = np.random.randint(0, len(allowed_ij))
+                ij_r = allowed_ij[idx_r]
+                snake = [ij_r]
+                temp_grid_mask[ij_r[0], ij_r[1]] = 1
+                for k in range(snake_length-2):
+                    # We allow all neighbors provided they are free OR wormholes.
+                    allowed_ij = self.free_neighbors(*ij_r)
+                    if len(allowed_ij) == 0:
+                        continue
+                    idx_r = np.random.randint(0, len(allowed_ij))
+                    ij_r = allowed_ij[idx_r]
+                    snake.append(ij_r)
+                    temp_grid_mask[ij_r[0], ij_r[1]] = 1
+                # Snake cannot end at a wormhole cell: we allow all neighbors provided they are free
+                # AND NOT wormholes.
+                allowed_ij = [
+                    (i,j) for i,j in self.neighbors(*ij_r) if not (temp_grid_mask[i,j] or self.wh_mask[i,j])
+                ]
                 assert len(allowed_ij) > 0, "Snake got stuck!"
                 idx_r = np.random.randint(0, len(allowed_ij))
                 ij_r = allowed_ij[idx_r]
-                conf[-1].append(ij_r)
-                self.grid_mask[ij_r[0], ij_r[1]] = 1
-            # Snake cannot end at a wormhole cell: we allow all neighbors provided they are free
-            # AND NOT wormholes.
-            allowed_ij = [
-                (i,j) for i,j in self.neighbors(*ij_r) if not (self.grid_mask[i,j] or self.wh_mask[i,j])
-            ]
-            assert len(allowed_ij) > 0, "Snake got stuck!"
-            idx_r = np.random.randint(0, len(allowed_ij))
-            ij_r = allowed_ij[idx_r]
-            conf[-1].append(ij_r)
-            self.grid_mask[ij_r[0], ij_r[1]] = 1
+                snake.append(ij_r)
+                temp_grid_mask[ij_r[0], ij_r[1]] = 1
+                snake_placed = True
+            self.grid_mask = temp_grid_mask.copy()
+            conf.append(snake.copy())
         return conf
 
     def reward_function(self, configuration: Configuration) -> int:
