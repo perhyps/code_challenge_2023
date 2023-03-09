@@ -12,6 +12,7 @@ def main():
     parser = ArgumentParser()
 
     parser.add_argument("-b", dest="beta", nargs=2, type=float, default=(.1, 10.), help="Starting and ending inverse temperatures.")
+    parser.add_argument("-f", action="store_true", dest="force_overwrite", default=False, help="Always overwrite output.")
     parser.add_argument("-m", dest="beta_mult", type=float, default=1.05, help="Multiplier for beta after each sweep.")
     parser.add_argument("-i", dest="input_path", type=str, required=True, help="Path to input file.")
     parser.add_argument("-o", dest="output_path", type=str, default=None, help="Path to output file.")
@@ -50,7 +51,7 @@ def main():
     if os.path.isfile(output_path):
         with open(output_path, "rb") as infile:
             data = pickle.load(infile)
-            if (pr := data["reward"]) <= grid.best_reward:
+            if (pr := data["reward"]) <= grid.best_reward or args.force_overwrite:
                 pass
             else:
                 sys.stderr.write(f"Not overwriting file as previous reward is better ({pr} > {grid.best_reward}).\n")

@@ -80,28 +80,12 @@ class Grid(object):
             else self.wh_neighs
         )
 
-#    def generate_random_configuration(self, snake_lengths: list[int]) -> Configuration:
-#        conf = np.full((R, C), "")
-#        for snake_id_m1, snake_length in enumerate(snake_lengths):
-#            snake_id = str(snake_id_m1 + 1)
-#            # Place snake's head.
-#            conf
-#            ir = np.random.randint(0, self.R)
-#            jr = np.random.randint(0, self.C)
-#            conf[ir, jr] += f"_{snake_id}"
-#            curr_ij = ir, jr
-#            for _ in range(snake_length-1):
-#                allowed_ij = [i,j for i,j in self.neighbors(*curr_ij) if conf[i,j] == "" or i,j in self.wormholes]
-#                assert len(allowed_ij) > 0, "Snake got stuck!"
-#                ir, jr = np.random.choice(allowed_ij)
-#                conf[ir, jr] += f"_{snake_id}"
-#                curr_ij = ir, jr
-#        return conf
-
-    def free_neighbors(self, i: int, j: int) -> list[tuple[int, int]]:
+    def free_neighbors(self, i: int, j: int, grid_mask: np.ndarray = None) -> list[tuple[int, int]]:
+        if grid_mask is None:
+            grid_mask = self.grid_mask
         return [
             (i_n, j_n) for i_n, j_n in self.neighbors(i, j)
-            if (1-self.grid_mask)[i_n, j_n] or self.wh_mask[i_n, j_n]
+            if (1-grid_mask)[i_n, j_n] or self.wh_mask[i_n, j_n]
         ]
 
     def generate_random_configuration(self, snake_lengths: list[int]) -> Configuration:
@@ -118,7 +102,7 @@ class Grid(object):
                 temp_grid_mask[ij_r[0], ij_r[1]] = 1
                 for k in range(snake_length-2):
                     # We allow all neighbors provided they are free OR wormholes.
-                    allowed_ij = self.free_neighbors(*ij_r)
+                    allowed_ij = self.free_neighbors(*ij_r, grid_mask=temp_grid_mask)
                     if len(allowed_ij) == 0:
                         continue
                     idx_r = np.random.randint(0, len(allowed_ij))
@@ -130,7 +114,8 @@ class Grid(object):
                 allowed_ij = [
                     (i,j) for i,j in self.neighbors(*ij_r) if not (temp_grid_mask[i,j] or self.wh_mask[i,j])
                 ]
-                assert len(allowed_ij) > 0, "Snake got stuck!"
+                if len(allowed_ij) == 0:
+                    continue
                 idx_r = np.random.randint(0, len(allowed_ij))
                 ij_r = allowed_ij[idx_r]
                 snake.append(ij_r)
@@ -191,13 +176,14 @@ class Grid(object):
         self.reward_history = [self.reward]
         while beta < beta1:
             for k_step in range(n_steps_per_sweep):
+                old_conf = self.configuration.copy()
                 self.try_step(beta)
                 try:
                     assert self.validate_conf()
                 except AssertionError:
                     sys.stderr.write(f"{old_conf=}\n")
                     sys.stderr.write(f"{self.configuration=}\n")
-                    raise AssertionError(f"Invalid configuration at step {k_step} of sweep {k_sweep}!")
+                    raise AssertionError(f"Invalid configuration at step {k_step} of sweep {self.n_sweeps}!")
                 self.reward_history.append(self.reward)
                 self.attempted_delta_reward_history.append(self.last_delta_reward)
             # Decrease temperature at the end of each sweep.
@@ -212,19 +198,3 @@ class Grid(object):
 
     def acceptance_rate(self) -> float:
         return self.accepted_moves / self.attempted_moves
-
-#class Annealer(object):
-#    def __init__(self, T0):
-#        self.T0 = T0
-#        self.T = T0
-#
-#    def cost(self, x) -> float:
-#        ...
-#
-#    def step(self):
-#        ...
-#
-#    def try_step(self):
-#        r = np.random.rand()
-#
-#    def
